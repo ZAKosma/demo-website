@@ -5,6 +5,7 @@
   <title>Hello, AR World! • A-Frame</title>
   <meta name="description" content="Hello, AR World! • A-Frame">
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/aframevr/aframe@master/examples/ar/js/aframe-ar-hit-test.js"></script>
   <script>
 <!--  <script type="module" src="./node_modules/aframe/dist/aframe-master.js">-->
     // import AFRAME from 'aframe';
@@ -23,6 +24,7 @@
 </head>
 <body>
 <a-scene
+        webxr="optionalFeatures:  hit-test;"
         reflection="directionalLight: a-light[type=directional]"
         ar-hit-test="target: #objects;"
         renderer="colorManagement: true; exposure: 1; toneMapping: ACESFilmic"
