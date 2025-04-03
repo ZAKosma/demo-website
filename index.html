@@ -6,6 +6,7 @@
     <meta name="description" content="Hello, AR World! • A-Frame">
     <script src="https://aframe.io/releases/1.7.0/aframe-master.js"></script>
     <script>
+      import { AFRAME } from 'https://aframe.io/releases/1.7.0/aframe-master.js';
       AFRAME.registerComponent('follow-shadow', {
         schema: {type: 'selector'},
         init() {this.el.object3D.renderOrder = -1;},
