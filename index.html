@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <title>Hello, AR World! • A-Frame</title>
   <meta name="description" content="Hello, AR World! • A-Frame">
-  <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>  <script>
+  <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+  <script>
     AFRAME.registerComponent('follow-shadow', {
       schema: {type: 'selector'},
       init() {this.el.object3D.renderOrder = -1;},
