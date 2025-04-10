@@ -3,14 +3,6 @@
 <head>
   <meta charset="utf-8">
   <title>A-Frame AR Carousel on a Platform</title>
-  <style>
-    a-scene {
-      background-color: pink;
-      width: 600px !important;
-      height: 300px !important;
-      margin: 0 auto;
-    }
-  </style>
   <script src="https://aframe.io/aframe/dist/aframe-v1.7.1.js"></script>
 
   <!-- Carousel item config -->
@@ -248,7 +240,6 @@
   </script>
 </head>
 <body>
-<div class="myScene">
   <a-scene reflection="directionalLight: a-light[type=directional]"
            ar-hit-test="target: #anchorRoot;"
            renderer="colorManagement: true; exposure: 1; toneMapping: ACESFilmic"
@@ -303,6 +294,5 @@
 
     <a-sky color="#ECECEC" hide-on-enter-ar></a-sky>
   </a-scene>
-</div>
 </body>
 </html>
