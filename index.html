@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>A-Frame AR Carousel on a Platform</title>
+  <title>A-Frame AR Carousel with Smart Hit Test</title>
   <script src="https://aframe.io/aframe/dist/aframe-v1.7.1.js"></script>
 
   <!-- Carousel item config -->
@@ -38,24 +38,10 @@
     AFRAME.registerComponent('intersectable', {
       init: function () {
         this.el.addEventListener('click', () => {
-          console.log('🖱️ Click detected on:', this.el);
-
           const itemData = this.el.getAttribute('carousel-item');
-          if (!itemData) {
-            console.warn('⚠️ No carousel-item data found.');
-            return;
-          }
-
+          if (!itemData) return;
           const link = itemData.link;
-          console.log('🔍 carousel-item data:', itemData);
-          console.log('🔗 Extracted link:', link);
-
-          if (link) {
-            console.log(`🚀 Opening link: ${link}`);
-            window.open(link, '_blank');
-          } else {
-            console.warn('⚠️ No link defined in carousel-item.');
-          }
+          if (link) window.open(link, '_blank');
         });
       }
     });
@@ -115,7 +101,6 @@
         pauseDuration: {type: 'number', default: 2000},
         rotateDuration: {type: 'number', default: 1000}
       },
-
       init: function () {
         this.items = Array.from(this.el.children);
         this.currentFocusIndex = 0;
@@ -129,10 +114,8 @@
         this.setAllToBackScale();
         this.setItemScale(this.currentFocusIndex, 'front');
       },
-
       tick: function (time, timeDelta) {
         this.timer += timeDelta;
-
         if (this.state === 'pause') {
           if (this.timer >= this.data.pauseDuration) {
             this.state = 'rotating';
@@ -150,7 +133,6 @@
           const angle = this.startAngle + (this.targetAngle - this.startAngle) * eased;
           this.setRotation(angle);
           this.lerpFocusScales(eased);
-
           if (t === 1) {
             this.state = 'pause';
             this.timer = 0;
@@ -160,7 +142,6 @@
           }
         }
       },
-
       layoutItems: function () {
         const center = new THREE.Vector3(0, 0.2, 0);
         for (let i = 0; i < this.items.length; i++) {
@@ -172,127 +153,138 @@
           const y = 0.2;
           item.object3D.position.set(x, y, z);
           item.object3D.lookAt(center);
-
-          const rotationOffset = (item.components['carousel-item']?.data?.rotationOffsetY || 0);
+          const rotationOffset = item.components['carousel-item']?.data?.rotationOffsetY || 0;
           item.object3D.rotateY(THREE.MathUtils.degToRad(rotationOffset));
         }
       },
-
       lerpFocusScales: function (t) {
         this.lerpItemScale(this.oldFocusIndex, 1.0 - t);
         this.lerpItemScale(this.newFocusIndex, t);
       },
-
       lerpItemScale: function (i, lerpFactor) {
         const item = this.items[i];
         if (!item) return;
         let frontScale = 1.0;
         let backScale = this.data.behindScale;
-        if (item.components && item.components['carousel-item']) {
-          const comp = item.components['carousel-item'].data;
+        const comp = item.components['carousel-item']?.data;
+        if (comp) {
           frontScale = comp.scaleFront;
           backScale = comp.scaleBack;
         }
         const targetScale = backScale + (frontScale - backScale) * lerpFactor;
         item.object3D.scale.set(targetScale, targetScale, targetScale);
       },
-
       setItemScale: function (i, which) {
-        if (!this.items[i]) return;
         const item = this.items[i];
-        let frontScale = 1.0;
-        let backScale = this.data.behindScale;
-        if (item.components && item.components['carousel-item']) {
-          const comp = item.components['carousel-item'].data;
-          frontScale = comp.scaleFront;
-          backScale = comp.scaleBack;
-        }
-        const scaleVal = (which === 'front') ? frontScale : backScale;
+        if (!item) return;
+        const comp = item.components['carousel-item']?.data || {};
+        const scaleVal = which === 'front' ? comp.scaleFront || 1.0 : comp.scaleBack || 0.5;
         item.object3D.scale.set(scaleVal, scaleVal, scaleVal);
-
         if (which === 'front') {
           item.setAttribute('focus-float', '');
-          setTimeout(() => item.removeAttribute('idle-float'), 600); // fade out first
+          setTimeout(() => item.removeAttribute('idle-float'), 600);
         } else {
           item.setAttribute('idle-float', '');
           setTimeout(() => item.removeAttribute('focus-float'), 600);
         }
       },
-
       setAllToBackScale: function () {
         for (let i = 0; i < this.items.length; i++) {
           this.setItemScale(i, 'back');
         }
       },
-
       setRotation: function (angle) {
         this.el.object3D.rotation.y = THREE.MathUtils.degToRad(angle % 360);
       },
-
       getCurrentRotation: function () {
         return THREE.MathUtils.radToDeg(this.el.object3D.rotation.y) % 360;
       },
-
       easeInOutQuad: function (t) {
-        return (t < 0.5) ? 2 * t * t : -1 + (4 - 2 * t) * t;
+        return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+      }
+    });
+  </script>
+
+  <!-- Smart Hit Test -->
+  <script>
+    AFRAME.registerComponent('smart-hit-test', {
+      init: function () {
+        const sceneEl = this.el;
+        sceneEl.addEventListener('click', (evt) => {
+          const raycaster = sceneEl.components.raycaster;
+          const intersects = raycaster?.intersections || [];
+          const hitObject = intersects.find(i => i.object.el?.classList.contains('intersectable'));
+
+          if (!hitObject) {
+            const frame = evt.detail?.frame;
+            const anchor = document.querySelector('#anchorRoot');
+            if (frame && anchor && sceneEl.systems['ar-hit-test']) {
+              const hitMatrix = sceneEl.systems['ar-hit-test'].hitMatrix;
+              if (hitMatrix) {
+                anchor.object3D.matrix.fromArray(hitMatrix);
+                anchor.object3D.matrix.decompose(anchor.object3D.position, anchor.object3D.quaternion, anchor.object3D.scale);
+              }
+            }
+          }
+        });
       }
     });
   </script>
 </head>
 <body>
-  <a-scene reflection="directionalLight: a-light[type=directional]"
-           ar-hit-test="target: #anchorRoot;"
-           renderer="colorManagement: true; exposure: 1; toneMapping: ACESFilmic"
-           shadow="type: pcfsoft"
-           xr-mode-ui="XRMode: xr">
+<a-scene smart-hit-test
+         reflection="directionalLight: a-light[type=directional]"
+         ar-hit-test="target: #anchorRoot;"
+         renderer="colorManagement: true; exposure: 1; toneMapping: ACESFilmic"
+         shadow="type: pcfsoft"
+         xr-mode-ui="XRMode: xr">
 
-    <a-assets>
-      <a-asset-item id="duck" src="./src/duck.glb"></a-asset-item>
-    </a-assets>
+  <a-assets>
+    <a-asset-item id="duck" src="./src/duck.glb"></a-asset-item>
+  </a-assets>
 
-    <a-light type="directional" light="castShadow:true;" position="1 3 2" intensity="1.5"></a-light>
+  <a-light type="directional" light="castShadow:true;" position="1 3 2" intensity="1.5"></a-light>
 
-    <a-camera position="0 2 3" rotation="-15 0 0">
-      <a-entity cursor="rayOrigin: mouse"
-                raycaster="objects: .intersectable; far: 30"
-                geometry="primitive: ring; radiusOuter: 0.015; radiusInner: 0.01"
-                material="shader: flat; color: #283644"
-                position="0 0 -0.75">
-      </a-entity>
-    </a-camera>
+  <a-camera position="0 2 3" rotation="-15 0 0">
+    <a-entity cursor="rayOrigin: mouse"
+              raycaster="objects: .intersectable; far: 30"
+              geometry="primitive: ring; radiusOuter: 0.015; radiusInner: 0.01"
+              material="shader: flat; color: #283644"
+              position="0 0 -0.75"></a-entity>
+  </a-camera>
 
-    <a-entity id="anchorRoot" shadow scale="1 1 1">
-      <a-plane id="platform" color="green" rotation="-90 0 0" width="2" height="2"
-               shadow="receive: true;" material="opacity: 0.8"></a-plane>
+  <a-entity id="anchorRoot" shadow scale="1 1 1">
+    <a-plane id="platform" color="green" rotation="-90 0 0" width="2" height="2"
+             shadow="receive: true;" material="opacity: 0.8"></a-plane>
 
-      <a-entity id="carousel"
-                carousel="radius: 1.0; behindScale: 0.2; pauseDuration: 1500; rotateDuration: 1000"
-                position="0 0 0" scale="1 1 1">
+    <a-entity id="carousel"
+              carousel="radius: 1.0; behindScale: 0.2; pauseDuration: 1500; rotateDuration: 1000"
+              position="0 0 0" scale="1 1 1">
 
-        <a-box class="intersectable" intersectable
-               carousel-item="scaleFront:1; scaleBack:0.2; link:https://en.wikipedia.org/wiki/Cube"
-               color="#4CC3D9" depth="0.5" height="0.5" width="0.5"></a-box>
+      <a-box class="intersectable" intersectable
+             carousel-item="scaleFront:1; scaleBack:0.2; link:https://en.wikipedia.org/wiki/Cube"
+             color="#4CC3D9" depth="0.5" height="0.5" width="0.5"></a-box>
 
-        <a-sphere class="intersectable" intersectable
-                  carousel-item="scaleFront:1.2; scaleBack:0.2; link:https://en.wikipedia.org/wiki/Sphere"
-                  radius="0.3" color="#EF2D5E"></a-sphere>
+      <a-sphere class="intersectable" intersectable
+                carousel-item="scaleFront:1.2; scaleBack:0.2; link:https://en.wikipedia.org/wiki/Sphere"
+                radius="0.3" color="#EF2D5E"></a-sphere>
 
-        <a-cylinder class="intersectable" intersectable
-                    carousel-item="scaleFront:1.0; scaleBack:0.2; link:https://en.wikipedia.org/wiki/Cylinder_(geometry)"
-                    radius="0.3" height="0.5" color="#FFC65D"></a-cylinder>
+      <a-cylinder class="intersectable" intersectable
+                  carousel-item="scaleFront:1.0; scaleBack:0.2; link:https://en.wikipedia.org/wiki/Cylinder_(geometry)"
+                  radius="0.3" height="0.5" color="#FFC65D"></a-cylinder>
 
-        <a-entity class="intersectable" intersectable
-                  carousel-item="scaleFront:2.0; scaleBack:0.5; rotationOffsetY:180; link:https://en.wikipedia.org/wiki/Rubber_duck_debugging"
-                  gltf-model="#duck" scale="2 2 2"></a-entity>
+      <a-entity class="intersectable" intersectable
+                carousel-item="scaleFront:2.0; scaleBack:0.5; rotationOffsetY:180; link:https://en.wikipedia.org/wiki/Rubber_duck_debugging"
+                gltf-model="#duck" scale="2 2 2"></a-entity>
 
-        <a-box class="intersectable" intersectable
-               carousel-item="scaleFront:1.0; scaleBack:0.2; link:https://xkcd.com/221/"
-               color="#FF00FF" depth="0.5" height="0.5" width="0.5"></a-box>
+      <a-box class="intersectable" intersectable
+             carousel-item="scaleFront:1.0; scaleBack:0.2; link:https://xkcd.com/221/"
+             color="#FF00FF" depth="0.5" height="0.5" width="0.5"></a-box>
 
-      </a-entity>
     </a-entity>
+  </a-entity>
 
-    <a-sky color="#ECECEC" hide-on-enter-ar></a-sky>
-  </a-scene>
+  <a-sky color="#ECECEC" hide-on-enter-ar></a-sky>
+</a-scene>
 </body>
 </html>
